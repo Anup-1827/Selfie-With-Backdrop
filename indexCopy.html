@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Background Removal</title>
+</head>
+<body>
+    <video id="video" autoplay playsinline></video>
+    <br>
+    <canvas id="output" width="355" height="550"></canvas>
+    <br>
+    <canvas id="drawDup" width="355" height="550"></canvas>
+    <br>
+    <canvas id="drawBack" width="355" height="550"></canvas>
+    <script src="./tfjs.js"></script>
+    <script src="./bodyPix.js"></script>
+
+</body>
+
+<script>
+
+const width = "355"
+const height = "550"
+  // Define constants
+const video = document.getElementById('video');
+const output = document.getElementById('output');
+const ctx = output.getContext("2d")
+
+// 
+const drawDupCanvas = document.getElementById("drawDup")
+const ctxDup = drawDupCanvas.getContext("2d")
+// 
+
+const drawBackCanvas = document.getElementById("drawBack")
+const ctxDrawback = drawBackCanvas.getContext("2d")
+// 
+
+const backdropImage = new Image()
+backdropImage.src = "./2_1.png"
+
+// Image with background and Background
+const backdropImageWithBackground = new Image();
+
+
+
+const netOptions = {
+  architecture: 'MobileNetV1',
+  outputStride: 16,
+  multiplier: 0.75,
+  quantBytes: 2,
+};
+let net;
+let videoStream;
+
+// Load BodyPix model
+async function loadBodyPix() {
+  net = await bodyPix.load(netOptions);
+}
+
+// Start video stream and remove background
+async function startVideo() {
+  try {
+    videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = videoStream;
+
+    video.addEventListener('loadedmetadata', () => {
+      video.width =  width
+      video.height = height
+      output.width = width;
+      output.height = height;
+
+
+      // 
+      drawDupCanvas.width = width
+      drawDupCanvas.height = height
+
+      drawBackCanvas.width = width
+      drawBackCanvas.height = height
+      // 
+
+    //   const segmentFrame = async () => {
+    //   const segmentation = await net.segmentPerson(video);
+    //   const backgroundBlurAmount = 10;
+    //   const edgeBlurAmount = 3;
+    //   bodyPix.drawBokehEffect(
+    //     output,
+    //     video,
+    //     segmentation,
+    //     backgroundBlurAmount,
+    //     edgeBlurAmount
+    //   );
+
+    //   requestAnimationFrame(segmentFrame);
+    // };
+
+
+    const segmentFrame = async () => {
+      // draw frame on canvas
+			ctx.drawImage(video, 0, 0, width, height);
+      const segmentation = await net.segmentPerson(video);
+
+      // Create an image with a transparent background
+      const faceImage = new ImageData(segmentation.width, segmentation.height)
+      
+      // Create Background Image
+      const backgroundImage = new ImageData(segmentation.width, segmentation.height)
+
+
+      const videoPixels = ctx.getImageData(0,0, width, height)
+
+      // console.log(videoPixels);
+
+      // Draw Dup
+      // for(let i=0; i< videoPixels.data.length; i+= 4){
+
+      //   faceImage.data[i] = videoPixels.data[i]
+      //   faceImage.data[i+1] = videoPixels.data[i+1]
+      //   faceImage.data[i+2] = videoPixels.data[i+2]
+      //   faceImage.data[i+3] = videoPixels.data[i+3]
+
+      // }
+
+      // drawDupCanvas.width = width
+      // drawDupCanvas.height = height
+      // ctxDup.putImageData(faceImage,0,0)
+
+
+     
+      for(let i=0; i<segmentation.data.length; i++) {
+    //The data array stores four values for each pixel
+    const [r, g, b, a] = [videoPixels.data[i*4], videoPixels.data[i*4+1], videoPixels.data[i*4+2], videoPixels.data[i*4+3]];
+    // [
+    // faceImage.data[i*4],
+    // faceImage.data[i*4+1],
+    // faceImage.data[i*4+2],
+    // faceImage.data[i*4+3]
+    // ] = !segmentation.data[i] ? [0, 0, 0, 1] : [r, g, b, a];
+
+    if(segmentation.data[i]){
+      // Face Image Data
+      faceImage.data[i*4] = r
+      faceImage.data[i*4+1] = g
+      faceImage.data[i*4+2] = b
+      faceImage.data[i*4+3] = a
+
+      // Background Image Data is Set to white
+      backgroundImage.data[i*4] = 0
+      backgroundImage.data[i*4+1] = 0
+      backgroundImage.data[i*4+2] = 0
+      backgroundImage.data[i*4+3] = 1
+    }
+    else{
+      // Face Image Data is Set to white
+      faceImage.data[i*4] = 0
+      faceImage.data[i*4+1] = 0
+      faceImage.data[i*4+2] = 0
+      faceImage.data[i*4+3] = 0
+
+      // Background Image Data
+      backgroundImage.data[i*4] = r
+      backgroundImage.data[i*4+1] = g
+      backgroundImage.data[i*4+2] = b
+      backgroundImage.data[i*4+3] = a
+    }
+
+  }
+
+  // console.log(faceImage.data);
+
+
+
+      // output.width = width
+      // output.height = height
+
+      flipImageDataHorizontally(backgroundImage);
+    flipImageDataHorizontally(faceImage);
+
+      
+      
+      ctxDup.putImageData(backgroundImage,0,0)
+      ctxDup.drawImage(backdropImage,0,0)
+      
+            // ctxDup.putImageData(faceImage,0,0)
+      
+      backdropImageWithBackground.src = drawDupCanvas.toDataURL();
+      
+      
+      drawBackCanvas.style.backgroundImage = "url('" + backdropImageWithBackground.src + "')";
+        ctxDrawback.putImageData(faceImage,0,0)
+
+
+
+
+      requestAnimationFrame(segmentFrame);
+    };
+    segmentFrame();
+
+    function flipImageDataHorizontally(imageData) {
+    var width = imageData.width;
+    var height = imageData.height;
+
+    for (var y = 0; y < height; y++) {
+      for (var x = 0; x < width / 2; x++) {
+        // Get the current pixel and its corresponding pixel on the other side
+        var pixelIndex = (y * width + x) * 4;
+        var oppositePixelIndex = (y * width + (width - x - 1)) * 4;
+
+        // Swap the pixel data (RGBA values)
+        for (var i = 0; i < 4; i++) {
+          var temp = imageData.data[pixelIndex + i];
+          imageData.data[pixelIndex + i] = imageData.data[oppositePixelIndex + i];
+          imageData.data[oppositePixelIndex + i] = temp;
+        }
+      }
+    }
+  }
+
+    });
+
+
+  } catch (error) {
+    console.error('Error accessing webcam:', error);
+  }
+}
+
+// Load the model and start the video stream
+loadBodyPix().then(startVideo);
+
+</script>
+</html>

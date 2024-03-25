@@ -1,0 +1,15 @@
+{
+    "name" : "Selfie With Backdrop Image",
+    "type" : "selfie-with-backdrop",
+    "tagName" : "selfie-with-backdrop",
+    "version": 1,
+    "customElementsVersion":1,
+    "description": "Get a selfie with the Backdrop Image",
+    "files":{
+        "js":[
+            "tfjs.js",
+            "bodyPix.js",
+            "get_selfie_with_backdrop.js"
+        ]
+    }
+}
